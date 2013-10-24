@@ -1288,6 +1288,17 @@ class Cursor(object):
          - An INSERT statement with a fullselect
 
         """
+        if self.__connection.dbms_name[0:3] == 'IDS':
+            identity_val= None
+            try:
+                last_serial= ibm_db.get_last_serial_value(self.stmt_handler)
+                if last_serial is not None:
+                    identity_val= int(last_serial)
+            except Exception, inst:
+                self.messages.append(_get_exception(inst))
+                raise self.messages[len(self.messages) - 1]
+            return identity_val
+                
         operation = 'SELECT IDENTITY_VAL_LOCAL() FROM SYSIBM.SYSDUMMY1'
         try:
             stmt_handler = ibm_db.prepare(self.conn_handler, operation)

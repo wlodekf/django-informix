@@ -10492,39 +10492,54 @@ static PyObject* ibm_db_check_function_support(PyObject *self, PyObject *args)
  * Returns a string representation of last inserted serial value on a successful call. 
  * Returns FALSE on failure.
  */
-/*
-PyObject *ibm_db_get_last_serial_value(int argc, PyObject **argv, PyObject *self)
+PyObject *ibm_db_get_last_serial_value(PyObject *self, PyObject *args)
 {
-	PyObject *stmt = NULL;
-	SQLCHAR *value = NULL;
-	stmt_handle *stmt_res;
-	int rc = 0;
-	
-	rb_scan_args(argc, argv, "1", &stmt);
+        PyObject *py_stmt_res = NULL;
+        stmt_handle *stmt_res;
+        SQLCHAR *value = NULL;
+        PyObject *retVal = NULL;        
+        int rc = 0;
 
-	if (!NIL_P(stmt)) {
-	  Data_Get_Struct(stmt, stmt_handle, stmt_res);
+        if (!PyArg_ParseTuple(args, "O", &py_stmt_res))
+                return NULL;
 
-	  / * We allocate a buffer of size 31 as per recommendations from the CLI IDS team * /
-	  value = ALLOC_N(char, 31);
-	  if ( value == NULL ) {
-		 PyErr_SetString(PyExc_Exception, "Failed to Allocate Memory");
-		 return Py_False;
-	  }
+        if (!NIL_P(py_stmt_res)) {
+                if (!PyObject_TypeCheck(py_stmt_res, &stmt_handleType)) {
+                        PyErr_SetString( PyExc_Exception, "Supplied statement object parameter is invalid" );
+                        return NULL;
+                } else {
+                        stmt_res = (stmt_handle *)py_stmt_res;
+                }
 
-	  rc = SQLGetStmtAttr((SQLHSTMT)stmt_res->hstmt, SQL_ATTR_GET_GENERATED_VALUE, (SQLPOINTER)value, 31, NULL);
-	  if ( rc == SQL_ERROR ) {
-		 _python_ibm_db_check_sql_errors( (SQLHSTMT)stmt_res->hstmt, SQL_HANDLE_STMT, rc, 1, NULL, -1, 1);
-		 return Py_False;
-	  }
-	  return INT2NUM(atoi(value));
-	}
-	else {
-	  PyErr_SetString(PyExc_Exception, "Supplied statement handle is invalid");
-	  return Py_False;
-	}
+                /* We allocate a buffer of size 31 as per recommendations from the CLI IDS team */
+                value = (SQLCHAR*)ALLOC_N(char, 31);
+                if ( value == NULL ) {
+                        PyErr_SetString(PyExc_Exception, "Failed to Allocate Memory");
+                        return Py_False;
+                }
+
+                rc = SQLGetStmtAttr((SQLHSTMT)stmt_res->hstmt, SQL_ATTR_GET_GENERATED_VALUE, (SQLPOINTER)value, 31, NULL);
+                if ( rc == SQL_ERROR ) {
+                        _python_ibm_db_check_sql_errors( (SQLHSTMT)stmt_res->hstmt, SQL_HANDLE_STMT, rc, 1, NULL, -1, 1);
+                        if(value != NULL) {
+                        	PyMem_Del(value);
+                        	value = NULL;
+                        }
+                        PyErr_Clear();
+                        Py_RETURN_FALSE;
+                }
+                retVal = StringOBJ_FromASCII((char *)value);
+                if(value != NULL) {
+                	PyMem_Del(value);
+                	value = NULL;
+                }
+                return retVal;
+        }
+        else {
+          PyErr_SetString(PyExc_Exception, "Supplied statement handle is invalid");
+          return Py_False;
+        }
 }
-*/
 
 static int _python_get_variable_type(PyObject *variable_value)
 {
@@ -10612,6 +10627,7 @@ static PyMethodDef ibm_db_Methods[] = {
 	{"next_result", (PyCFunction)ibm_db_next_result, METH_VARARGS, "Requests the next result set from a stored procedure"},
 	{"num_fields", (PyCFunction)ibm_db_num_fields, METH_VARARGS, "Returns the number of fields contained in a result set"},
 	{"num_rows", (PyCFunction)ibm_db_num_rows, METH_VARARGS, "Returns the number of rows affected by an SQL statement"},
+	{"get_last_serial_value", (PyCFunction)ibm_db_get_last_serial_value, METH_VARARGS, "Returns a string representation of last inserted serial value on a successful call"},
 	{"get_num_result", (PyCFunction)ibm_db_get_num_result, METH_VARARGS, "Returns the number of rows in a current open non-dynamic scrollable cursor"},
 	{"primary_keys", (PyCFunction)ibm_db_primary_keys, METH_VARARGS, "Returns a result set listing primary keys for a table"},
 	{"procedure_columns", (PyCFunction)ibm_db_procedure_columns, METH_VARARGS, "Returns a result set listing the parameters for one or more stored procedures."},
