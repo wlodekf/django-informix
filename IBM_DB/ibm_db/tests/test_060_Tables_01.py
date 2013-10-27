@@ -49,7 +49,7 @@ class IbmDbTestCase(unittest.TestCase):
       pass
     
     if conn:
-      result = ibm_db.tables(conn, None, 'T')
+      result = ibm_db.tables(conn, None, 't')
       i = 0
       row = ibm_db.fetch_both(result)
       while ( row ):
@@ -87,8 +87,8 @@ class IbmDbTestCase(unittest.TestCase):
 #/T/T4
 #done!
 #__IDS_EXPECTED__
-#/T%s/t1
-#/T%s/t2
-#/T%s/t3
-#/T%s/t4
+#/t%s/t1
+#/t%s/t2
+#/t%s/t3
+#/t%s/t4
 #done!

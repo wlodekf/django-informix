@@ -33,11 +33,15 @@ class IbmDbTestCase(unittest.TestCase):
         result = ibm_db.statistics(conn,None,config.user,"index_test",True)
       else:
         result = ibm_db.statistics(conn,None,None,"INDEX_TEST",True)
+        
       row = ibm_db.fetch_tuple(result)
-      print row[2]  # TABLE_NAME
-      print row[3]  # NON_UNIQUE
-      print row[5]  # INDEX_NAME
-      print row[8]  # COLUMN_NAME
+      while(row):
+          if row[6] != 0: # skip table info
+              print row[2]  # TABLE_NAME
+              print row[3]  # NON_UNIQUE
+              print row[5]  # INDEX_NAME
+              print row[8]  # COLUMN_NAME
+          row= ibm_db.fetch_tuple(result)          
 
       try:
           rc = ibm_db.exec_immediate(conn, "DROP TABLE index_test2")
@@ -52,10 +56,13 @@ class IbmDbTestCase(unittest.TestCase):
       else:
         result = ibm_db.statistics(conn,None,None,"INDEX_TEST2",True)
       row = ibm_db.fetch_tuple(result)
-      print row[2]  # TABLE_NAME
-      print row[3]  # NON_UNIQUE
-      print row[5]  # INDEX_NAME
-      print row[8]  # COLUMN_NAME
+      while(row):
+          if row[6] != 0: # skip table info      
+              print row[2]  # TABLE_NAME
+              print row[3]  # NON_UNIQUE
+              print row[5]  # INDEX_NAME
+              print row[8]  # COLUMN_NAME
+          row= ibm_db.fetch_tuple(result)              
 
       print "Test non-existent table:"
       if (server.DBMS_NAME[0:3] == 'IDS'):

@@ -31,4 +31,4 @@ class IbmDbTestCase(unittest.TestCase):
 #__SYSTEMI_EXPECTED__
 #[IBM][CLI Driver] SQL1013N  The database alias name or database name "X" could not be found.  SQLSTATE=42705 SQLCODE=-1013
 #__IDS_EXPECTED__
-#[IBM][CLI Driver] SQL1013N  The database alias name or database name "X" could not be found.  SQLSTATE=42705 SQLCODE=-1013
+#[IBM][CLI Driver] SQL1531N  The connection failed because the name specified with the DSN connection string keyword could not be found in either the db2dsdriver.cfg configuration file or the db2cli.ini configuration file.  Data source name specified in the connection string: "X". SQLCODE=-1531

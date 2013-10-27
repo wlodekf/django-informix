@@ -52,9 +52,9 @@ class IbmDbTestCase(unittest.TestCase):
       server = ibm_db.server_info( conn )
       if (server.DBMS_NAME[0:3] == 'IDS'):
         op = {ibm_db.ATTR_CASE: ibm_db.CASE_UPPER}
-        ibm_db.set_option(conn, op, 0)
+        ibm_db.set_option(conn, op, 1)
 
-      result = ibm_db.tables(conn, None, 'T');    
+      result = ibm_db.tables(conn, None, 't');    
       i = 0
       row = ibm_db.fetch_both(result)
       while ( row ):
@@ -93,8 +93,8 @@ class IbmDbTestCase(unittest.TestCase):
 #TT4TABLE
 #done!
 #__IDS_EXPECTED__
-#T%st1TABLE%s
-#T%st2TABLE%s
-#T%st3TABLE%s
-#T%st4TABLE%s
+#t%st1TABLE%s
+#t%st2TABLE%s
+#t%st3TABLE%s
+#t%st4TABLE%s
 #done!

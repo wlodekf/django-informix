@@ -25,7 +25,7 @@ class IbmDbTestCase(unittest.TestCase):
       server = ibm_db.server_info( conn )
       if (server.DBMS_NAME[0:3] == 'IDS'):
          op = {ibm_db.ATTR_CASE: ibm_db.CASE_UPPER}
-         ibm_db.set_option(conn, op, 0)
+         ibm_db.set_option(conn, op, 1)
 
       try:
         sql = 'drop table test'
@@ -54,7 +54,7 @@ class IbmDbTestCase(unittest.TestCase):
       ibm_db.execute(stmt)
       print "Number of affected rows: %d" % ibm_db.get_num_result(stmt)
 
-      sql = "insert into test values( 1, 'some', 'here is a clob value', '<?xml version=\"1.0\" encoding=\"UTF-8\" ?><test attribute=\"value\"/>')"
+      sql = "insert into test values( 1, 'some', 'here is a clob value', '<?xml version=\"1.0\" encoding=\"UTF-16\" ?><test attribute=\"value\"/>')"
 
       stmt = ibm_db.prepare(conn, sql)
       ibm_db.set_option(stmt, cursor_option, 0)
@@ -186,4 +186,4 @@ class IbmDbTestCase(unittest.TestCase):
 #Number of affected rows: 3
 #1, some, here is a clob value, <?xml version="1.0" encoding="UTF-16" ?><test attribute="value"/>
 #2, value, clob data, None
-#2, in varchar, data2, None)
+#2, in varchar, data2, None

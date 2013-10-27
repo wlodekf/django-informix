@@ -48,7 +48,7 @@ class IbmDbTestCase(unittest.TestCase):
     except:
       pass
     
-    result = ibm_db.tables(conn, None, 'T')
+    result = ibm_db.tables(conn, None, 't')
     
     for i in range(0, ibm_db.num_fields(result)):
       print "%s, " % ibm_db.field_name(result, i)
@@ -96,7 +96,7 @@ class IbmDbTestCase(unittest.TestCase):
 #__IDS_EXPECTED__
 #table_cat, table_schem, table_name, table_type, remarks, 
 #
-#, T%s, t1, TABLE%s, , 
-#, T%s, t2, TABLE%s, , 
-#, T%s, t3, TABLE%s, , 
-#, T%s, t4, TABLE%s, ,
+#, t%s, t1, TABLE%s, , 
+#, t%s, t2, TABLE%s, , 
+#, t%s, t3, TABLE%s, , 
+#, t%s, t4, TABLE%s, ,

@@ -186,4 +186,3 @@ class IbmDbTestCase(unittest.TestCase):
 #test_foreign_keys
 #namef
 #[IBM][CLI Driver] CLI0124E  Invalid argument value. SQLSTATE=HY009 SQLCODE=-99999
-#No Data Found

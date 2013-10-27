@@ -21,7 +21,11 @@ class IbmDbTestCase(unittest.TestCase):
       print "Could not make a connection." 
       return 0
     fp = open("tests/spook_out.png", "wb")
-    result = ibm_db.exec_immediate(conn, "SELECT picture, LENGTH(picture) FROM animal_pics WHERE name = 'Spook'")
+    serverinfo = ibm_db.server_info( conn )
+    if (serverinfo.DBMS_NAME[0:3] == 'IDS'):    
+        result = ibm_db.exec_immediate(conn, "SELECT picture FROM animal_pics WHERE name = 'Spook'")
+    else:
+        result = ibm_db.exec_immediate(conn, "SELECT picture, LENGTH(picture) FROM animal_pics WHERE name = 'Spook'")
     if (not result):
       print "Could not execute SELECT statement."
       return 0
