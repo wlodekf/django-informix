@@ -1,6 +1,12 @@
 Change Log
 =============
 
+2014/01/30 adjustments for Informix IDS
+ - recognition of some integrity errors (instead of just database error)
+ - uppercase metadata labels
+ - don't uppercase set_case
+ - no schema in columns
+  
 2007/12/04 (setup.py 0.2.0):
  - added the ability to create Python Eggs by running: 
    $ python setup.py bdist_egg

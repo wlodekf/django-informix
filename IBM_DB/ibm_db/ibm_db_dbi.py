@@ -14,6 +14,7 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Swetha Patel, Abhigyan Agrawal, Tarun Pasrija, Rahul Priyadarshi|
+# | Wlodek Futrega                                                           |
 # +--------------------------------------------------------------------------+
 
 """
@@ -273,13 +274,25 @@ DATETIME = DBAPITypeObject(("TIMESTAMP",))
 
 ROWID = DBAPITypeObject(())
 
-# This method is used to determine the type of error that was 
-# generated.  It takes an exception instance as an argument, and 
-# returns exception object of the appropriate type.
 def _get_exception(inst):
-    # These tuple are used to determine the type of exceptions that are
+    """
+    This method is used to determine the type of error that was generated.  
+    It takes an exception instance as an argument, and 
+    returns exception object of the appropriate type.
+    """
+    if inst is None:
+        return Error('An error has occured')
+    
+    message = repr(inst)
+    if message.startswith("Exception('") and message.endswith("',)"):
+        message = message[11:]
+        message = message[:len(message)-3]
+
+    informix= 'IDS/' in message
+    
+    # These tuples are used to determine the type of exceptions that are
     # thrown by the database.  They store the SQLSTATE code and the
-    # SQLSTATE class code(the 2 digit prefix of the SQLSTATE code)  
+    # SQLSTATE class code(the 2 digit prefix of the SQLSTATE code)
     warning_error_tuple = ('01', )
     data_error_tuple = ('02', '22', '10601', '10603', '10605', '10901', '10902', 
                                                                '38552', '54')
@@ -298,6 +311,10 @@ def _get_exception(inst):
 
     not_supported_error_tuple = ('0A', '10509')
 
+    if informix:
+        # For Informix IDS SQLCODE is used
+        integrity_error_tuple = ('-268', '-391', '-691', '-703')
+        
     # These tuple are used to determine the type of exceptions that are
     # thrown from the driver module. 
     interface_exceptions = (                  "Supplied parameter is invalid",
@@ -347,35 +364,32 @@ def _get_exception(inst):
     # by the driver and return the appropriate exception type.  If it 
     # is not possible to determine the type of exception generated 
     # return the generic Error exception.
-    if inst is not None:
-        message = repr(inst)
-        if message.startswith("Exception('") and message.endswith("',)"):
-            message = message[11:]
-            message = message[:len(message)-3]
 
-        index = message.find('SQLSTATE=')
-        if( message != '') & (index != -1):
-            error_code = message[(index+9):(index+14)]
+    index = message.find('SQLCODE=' if informix else 'SQLSTATE=')            
+    if( message != '') & (index != -1):
+        if informix:
+            error_code = message[(index+8):(index+13)]
             prefix_code = error_code[:2]
         else:
-            for key in interface_exceptions:
-                if message.find(key) != -1:
-                    return InterfaceError(message)
-            for key in programming_exceptions:
-                if message.find(key) != -1:
-                    return ProgrammingError(message)
-            for key in operational_exceptions:
-                if message.find(key) != -1:
-                    return OperationalError(message)
-            for key in database_exceptions:
-                if message.find(key) != -1:
-                    return DatabaseError(message)  
-            for key in statement_exceptions:
-                if message.find(key) != -1:
-                    return DatabaseError(message)
-            return Error(message)
+            error_code = message[(index+9):(index+14)]
+            prefix_code = error_code[:2]            
     else:
-        return Error('An error has occured')
+        for key in interface_exceptions:
+            if message.find(key) != -1:
+                return InterfaceError(message)
+        for key in programming_exceptions:
+            if message.find(key) != -1:
+                return ProgrammingError(message)
+        for key in operational_exceptions:
+            if message.find(key) != -1:
+                return OperationalError(message)
+        for key in database_exceptions:
+            if message.find(key) != -1:
+                return DatabaseError(message)  
+        for key in statement_exceptions:
+            if message.find(key) != -1:
+                return DatabaseError(message)
+        return Error(message)
 
     # First check if the SQLSTATE is in the tuples, if not check
     # if the SQLSTATE class code is in the tuples to determine the
@@ -647,6 +661,14 @@ class Connection(object):
         """
         self.conn_handler = conn_handler
 
+        self.informix= False
+        server= ibm_db.server_info( conn_handler )
+        if (server.DBMS_NAME[:3] == 'IDS'):
+            # Upper case metadata labels
+            op= {ibm_db.ATTR_CASE: ibm_db.CASE_UPPER}
+            ibm_db.set_option(conn_handler, op, 1)
+            self.informix= True # for IDS conditional processing
+                    
         # Used to identify close cursors for generating exceptions 
         # after the connection is closed.
         self._cursor_list = []
@@ -792,7 +814,7 @@ class Connection(object):
         return tuple(server_info)
     
     def set_case(self, server_type, str_value):
-        return str_value.upper()
+        return str_value.upper() if not self.informix else str_value
 
     # Retrieves the tables for a specified schema (and/or given table name)
     def tables(self, schema_name=None, table_name=None):
@@ -893,7 +915,7 @@ class Connection(object):
         return result        
 
     # Retrieves metadata pertaining to foreign keys for specified schema (and/or table name)
-    def foreign_keys(self, unique=True, schema_name=None, table_name=None):
+    def foreign_keys(self, unique=True, schema_name=None, table_name=None, reverse= False):
         """Input: connection - ibm_db.IBM_DBConnection object
            Return: sequence of FK metadata dicts for the specified table
         Example:
@@ -909,6 +931,7 @@ class Connection(object):
            'FKTABLE_NAME':  'ENGINE_EMAIL_ADDRESSES', 
            'FKTABLE_SCHEM': 'PYTHONIC' 
            }
+           Reverse returnes all foreign keys pointing to a given table.
         """
         result = []
         if schema_name is not None:
@@ -917,7 +940,10 @@ class Connection(object):
             table_name = self.set_case("DB2_LUW", table_name)
 
         try:
-          stmt = ibm_db.foreign_keys(self.conn_handler, None, None, None, None, schema_name, table_name)
+          if reverse:
+              stmt = ibm_db.foreign_keys(self.conn_handler, None, schema_name, table_name, None, None, None)
+          else:            
+              stmt = ibm_db.foreign_keys(self.conn_handler, None, None, None, None, schema_name, table_name )
           row = ibm_db.fetch_assoc(stmt)
           i = 0
           while (row):
@@ -956,7 +982,13 @@ class Connection(object):
           table_name = self.set_case("DB2_LUW", table_name)
 
         try:
+          if self.informix:
+              # Schemat must be reset for IDS to return correct data
+              curr_schema= self.get_current_schema()
+              self.set_current_schema('')
           stmt = ibm_db.columns(self.conn_handler, None, schema_name, table_name)
+          if self.informix:
+              self.set_current_schema(curr_schema)
           row = ibm_db.fetch_assoc(stmt)
           i = 0
           while (row):
@@ -1288,7 +1320,7 @@ class Cursor(object):
          - An INSERT statement with a fullselect
 
         """
-        if self.__connection.dbms_name[0:3] == 'IDS':
+        if self.__connection.informix:
             identity_val= None
             try:
                 last_serial= ibm_db.get_last_serial_value(self.stmt_handler)
