@@ -18,9 +18,26 @@
 # +--------------------------------------------------------------------------+
 
 from ibm_db_django import operations
+
+if( operations.djangoVersion[0:2] >= ( 1, 4 ) ):
+    from django.utils.timezone import is_aware, is_naive, utc 
+    from django.conf import settings
     
+        
 class DatabaseOperations ( operations.DatabaseOperations ):
             
+    compiler_module = "ibm_db_informix.compiler"
+
+    def cache_key_culling_sql(self):
+        """
+        Returns an SQL query that retrieves the first cache key greater than the
+        n smallest.
+
+        This is used by the 'db' cache backend to determine where to start
+        culling.
+        """
+        return "SELECT FIRST 1 SKIP %%s cache_key FROM %s ORDER BY cache_key"
+    
     def check_aggregate_support( self, aggregate ):
         
         if aggregate.sql_function == 'AVG':
@@ -34,6 +51,20 @@ class DatabaseOperations ( operations.DatabaseOperations ):
         else:
             return " %s(%s) " % ( lookup_type.upper(), field_name )
      
+    def datetime_extract_sql(self, lookup_type, field_name, tzname):
+        # Function to extract time zone-aware day, month or day of week from timestamps   
+        if settings.USE_TZ:
+            hr, min = self._get_utcoffset(tzname)
+            if hr < 0:
+                field_name = "%s - %s HOURS - %s MINUTES" % (field_name, -hr, -min)
+            else:
+                field_name = "%s + %s HOURS + %s MINUTES" % (field_name, hr, min)
+                
+        if lookup_type.upper() == 'WEEK_DAY':
+            return " WEEKDAY(%s)+1 " % ( field_name ), []
+        else:
+            return " %s(%s) " % ( lookup_type.upper(), field_name ), []
+             
     def date_trunc_sql( self, lookup_type, field_name ):
         """
         Given a lookup_type of 'year', 'month' or 'day', returns the SQL that
@@ -43,6 +74,16 @@ class DatabaseOperations ( operations.DatabaseOperations ):
         """    
         return "(%s::DATETIME YEAR TO %s::DATETIME YEAR TO MINUTE)" % (field_name, lookup_type.upper())        
     
+    # Truncating the time zone-aware timestamps value on the basic of lookup type
+    def datetime_trunc_sql( self, lookup_type, field_name, tzname ):
+        if settings.USE_TZ:
+            hr, min = self._get_utcoffset(tzname)
+            if hr < 0:
+                field_name = "%s - %s HOURS - %s MINUTES" % (field_name, -hr, -min)
+            else:
+                field_name = "%s + %s HOURS + %s MINUTES" % (field_name, hr, min)
+        return "(%s::DATETIME YEAR TO %s::DATETIME YEAR TO SECOND)" % (field_name, lookup_type.upper()), []
+        
     def date_interval_sql( self, sql, connector, timedelta ):
         """
         Implements the interval functionality for expressions.

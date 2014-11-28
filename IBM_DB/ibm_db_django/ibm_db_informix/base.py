@@ -77,14 +77,15 @@ class DatabaseWrapper( base.DatabaseWrapper ):
         self.features = DatabaseFeatures( self )    
         self.validation = DatabaseValidation( self )                   
 
-    def _cursor( self, settings = None ):
+    def get_new_connection(self, conn_params):
         """
-        Resetting has_bulk_insert set in parent method.
+        To override fatures.has_bulk_insert incorrectly set 
+        in parent for IDS to True.  
         """
-        cursor= super( DatabaseWrapper, self )._cursor( settings )
+        connection = super( DatabaseWrapper, self ).get_new_connection(conn_params)
         self.features.has_bulk_insert = False
-        return cursor
-            
+        return connection
+                
     def check_constraints(self, table_names=None):
         """
         To check constraints, we set constraints to immediate. 

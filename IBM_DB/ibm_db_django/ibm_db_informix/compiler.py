@@ -37,7 +37,7 @@ class SQLCompiler( compiler.SQLCompiler ):
                 result.append('SKIP %d' % self.query.low_mark)        
             if self.query.high_mark is not None:
                 result.append('FIRST %d' % ((self.query.high_mark-self.query.low_mark) or 1))
-            result.append(sql_ori[7:])
+            result.append(sql[7:])
         
             sql= ' '.join(result)
         
