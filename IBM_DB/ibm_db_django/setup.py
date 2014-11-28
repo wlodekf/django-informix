@@ -1,9 +1,8 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2009.                                      |
+# | (C) Copyright IBM Corporation 2009-2014.                                      |
 # +--------------------------------------------------------------------------+
-# | This module complies with Django 1.0 and is                              |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
 # | you may not use this file except in compliance with the License.         |
 # | You may obtain a copy of the License at                                  |
@@ -40,7 +39,6 @@ setup (
                           'http://pypi.python.org/pypi/Django/'],
     description       = 'DB2 support for Django framework.',
     long_description  = 'DB2 support for Django framework.',
-    download_url      = 'http://code.google.com/p/ibm-db/downloads/list',
     author            = 'Ambrish Bhargava, Tarun Pasrija, Rahul Priyadarshi',
     author_email      = 'opendev@us.ibm.com',
     maintainer        = 'IBM Application Development Team',

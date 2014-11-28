@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2009-2013.                                      |
+# | (C) Copyright IBM Corporation 2009-2014.                                      |
 # +--------------------------------------------------------------------------+
 # | This module complies with Django 1.0 and is                              |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -29,7 +29,7 @@ if not _IS_JYTHON:
 else:
     from com.ziclix.python.sql import zxJDBC
 
-from django.db.backends import BaseDatabaseIntrospection
+from django.db.backends import BaseDatabaseIntrospection, FieldInfo
 from django import VERSION as djangoVersion
 
 class DatabaseIntrospection( BaseDatabaseIntrospection ):
@@ -39,41 +39,29 @@ class DatabaseIntrospection( BaseDatabaseIntrospection ):
     """
 
     if not _IS_JYTHON:
-        if( djangoVersion[0:2] <= ( 1, 1 ) ):
-            data_types_reverse = {
-                Database.STRING :           "CharField",
-                Database.TEXT :             "TextField",
-                Database.XML :              "XMLField",
-                Database.NUMBER :           "IntegerField",
-                Database.BIGINT :           "IntegerField",
-                Database.FLOAT :            "FloatField",
-                Database.DECIMAL :          "DecimalField",
-                Database.DATE :             "DateField",
-                Database.TIME :             "TimeField",
-                Database.DATETIME :         "DateTimeField",
-                Database.BINARY :           "ImageField",
-            }
+        data_types_reverse = {
+            Database.STRING :           "CharField",
+            Database.TEXT :             "TextField",
+            Database.XML :              "XMLField",
+            Database.NUMBER :           "IntegerField",
+            Database.FLOAT :            "FloatField",
+            Database.DECIMAL :          "DecimalField",
+            Database.DATE :             "DateField",
+            Database.TIME :             "TimeField",
+            Database.DATETIME :         "DateTimeField",
+        }    
+        if(djangoVersion[0:2] > (1, 1)):
+            data_types_reverse[Database.BINARY] = "BinaryField"
+            data_types_reverse[Database.BIGINT] = "BigIntegerField"
         else:
-            data_types_reverse = {
-                Database.STRING :           "CharField",
-                Database.TEXT :             "TextField",
-                Database.XML :              "XMLField",
-                Database.NUMBER :           "IntegerField",
-                Database.BIGINT :           "BigIntegerField",
-                Database.FLOAT :            "FloatField",
-                Database.DECIMAL :          "DecimalField",
-                Database.DATE :             "DateField",
-                Database.TIME :             "TimeField",
-                Database.DATETIME :         "DateTimeField",
-                Database.BINARY :           "ImageField",
-            }
+            data_types_reverse[Database.BIGINT] = "IntegerField"
     else:
         data_types_reverse = {
             zxJDBC.CHAR:                "CharField",
             zxJDBC.BIGINT:              "BigIntegerField",
-            zxJDBC.BINARY:              "ImageField",
+            zxJDBC.BINARY:              "BinaryField",
             zxJDBC.BIT:                 "SmallIntegerField",
-            zxJDBC.BLOB:                "ImageField",
+            zxJDBC.BLOB:                "BinaryField",
             zxJDBC.CLOB:                "TextField",
             zxJDBC.DATE:                "DateField",
             zxJDBC.DECIMAL:             "DecimalField",
@@ -90,6 +78,13 @@ class DatabaseIntrospection( BaseDatabaseIntrospection ):
             zxJDBC.TIME:                "TimeField",
         }
      
+    def get_field_type(self, data_type, description):
+        if not _IS_JYTHON:
+            if data_type == Database.NUMBER:
+                if description.precision == 5:
+                    return 'SmallIntegerField'
+        return super(DatabaseIntrospection, self).get_field_type(data_type, description)
+    
     # Converting table name to lower case.
     def table_name_converter ( self, name ):        
         return name.lower()
@@ -145,13 +140,42 @@ class DatabaseIntrospection( BaseDatabaseIntrospection ):
                 #col[16] is index of column in table
                 return col[16] - 1
     
+    def get_key_columns(self, cursor, table_name):
+        relations = []
+        if not _IS_JYTHON:
+            schema = cursor.connection.get_current_schema()
+            for fk in cursor.connection.foreign_keys( True, schema, table_name ):
+                relations.append( (fk['FKCOLUMN_NAME'].lower(), fk['PKTABLE_NAME'].lower(), fk['PKCOLUMN_NAME'].lower()) )
+        else:
+            cursor.execute( "select current_schema from sysibm.sysdummy1" )
+            schema = cursor.fetchone()[0]
+            # foreign_keys(String primaryCatalog, String primarySchema, String primaryTable, String foreignCatalog, String foreignSchema, String foreignTable) 
+            # gives a description of the foreign key columns in the foreign key table that reference the primary key columns 
+            # of the primary key table (describe how one table imports another's key.) This should normally return a single foreign key/primary key pair 
+            # (most tables only import a foreign key from a table once.) They are ordered by FKTABLE_CAT, FKTABLE_SCHEM, FKTABLE_NAME, and KEY_SEQ
+            cursor.foreignkeys( None, schema, table_name, None, '%', '%' )
+            for fk in cursor.fetchall():
+                # fk[2] is primary key table name, fk[3] is primary key column name, fk[7] is foreign key column name being exported
+                relations.append( (fk[7], fk[2], fk[3]) )
+        return relations
+        
     # Getting list of indexes associated with the table provided.
     def get_indexes( self, cursor, table_name ):
         indexes = {}
+        # To skip indexes across multiple fields
+        multifield_indexSet = set()
         if not _IS_JYTHON:
             schema = cursor.connection.get_current_schema()
-            for index in cursor.connection.indexes( True, schema, table_name ):
+            all_indexes = cursor.connection.indexes( True, schema, table_name )
+            for index in all_indexes:
+                if (index['ORDINAL_POSITION'] is not None) and (index['ORDINAL_POSITION']== 2):
+                    multifield_indexSet.add(index['INDEX_NAME'])
+                    
+            for index in all_indexes:
                 temp = {}
+                if index['INDEX_NAME'] in multifield_indexSet:
+                    continue
+                
                 if ( index['NON_UNIQUE'] ):
                     temp['unique'] = False
                 else:
@@ -166,8 +190,17 @@ class DatabaseIntrospection( BaseDatabaseIntrospection ):
             schema = cursor.fetchone()[0]
             # statistics(String catalog, String schema, String table, boolean unique, boolean approximate) returns a description of a table's indices and statistics. 
             cursor.statistics( None, schema, table_name, 0, 0 )
-            for index in cursor.fetchall():
+            all_indexes = cursor.fetchall()
+            for index in all_indexes:
+                #index[7] indicate ORDINAL_POSITION within index, and index[5] is index name
+                if index[7] == 2:
+                    multifield_indexSet.add(index[5])
+                    
+            for index in all_indexes:
                 temp = {}
+                if index[5] in multifield_indexSet:
+                    continue
+                
                 # index[3] indicate non-uniqueness of column
                 if ( index[3] != None ):
                     if ( index[3] ) == 1:
@@ -190,6 +223,88 @@ class DatabaseIntrospection( BaseDatabaseIntrospection ):
         qn = self.connection.ops.quote_name
         cursor.execute( "SELECT * FROM %s FETCH FIRST 1 ROWS ONLY" % qn( table_name ) )   
         description = []
-        for desc in cursor.description:
-            description.append( [ desc[0].lower(), ] + desc[1:] )
+        if djangoVersion < (1, 6):
+            for desc in cursor.description:
+                description.append( [ desc[0].lower(), ] + desc[1:] )
+        else:
+            for desc in cursor.description:
+                description.append(FieldInfo(*[desc[0].lower(), ] + desc[1:]))
+        
         return description
+
+    def get_constraints(self, cursor, table_name):
+        constraints = {} 
+        if not _IS_JYTHON:
+            schema = cursor.connection.get_current_schema()
+            sql = "SELECT CONSTNAME, COLNAME FROM SYSCAT.COLCHECKS WHERE TABSCHEMA='%(schema)s' AND TABNAME='%(table)s'" % {'schema': schema.upper(), 'table': table_name.upper()}
+            cursor.execute(sql)
+            for constname, colname in cursor.fetchall():
+                if constname not in constraints:
+                    constraints[constname] = {
+                        'columns': [],
+                        'primary_key': False,
+                        'unique': False,
+                        'foreign_key': None,
+                        'check': True,
+                        'index': False
+                    }
+                constraints[constname]['columns'].append(colname.lower())
+                
+            sql = "SELECT KEYCOL.CONSTNAME, KEYCOL.COLNAME FROM SYSCAT.KEYCOLUSE KEYCOL INNER JOIN SYSCAT.TABCONST TABCONST ON KEYCOL.CONSTNAME=TABCONST.CONSTNAME WHERE TABCONST.TABSCHEMA='%(schema)s' and TABCONST.TABNAME='%(table)s' and TABCONST.TYPE='U'" % {'schema': schema.upper(), 'table': table_name.upper()}
+            cursor.execute(sql)
+            for constname, colname in cursor.fetchall():
+                if constname not in constraints:
+                    constraints[constname] = {
+                        'columns': [],
+                        'primary_key': False,
+                        'unique': True,
+                        'foreign_key': None,
+                        'check': False,
+                        'index': True
+                    }
+                constraints[constname]['columns'].append(colname.lower())
+            
+            for pkey in cursor.connection.primary_keys(None, schema, table_name):
+                if pkey['PK_NAME'] not in constraints:
+                    constraints[pkey['PK_NAME']] = {
+                        'columns': [],
+                        'primary_key': True,
+                        'unique': False,
+                        'foreign_key': None,
+                        'check': False,
+                        'index': True
+                    }
+                constraints[pkey['PK_NAME']]['columns'].append(pkey['COLUMN_NAME'].lower())    
+            
+            for fk in cursor.connection.foreign_keys( True, schema, table_name ):
+                if fk['FK_NAME'] not in constraints:
+                    constraints[fk['FK_NAME']] = {
+                        'columns': [],
+                        'primary_key': False,
+                        'unique': False,
+                        'foreign_key': (fk['PKTABLE_NAME'].lower(), fk['PKCOLUMN_NAME'].lower()),
+                        'check': False,
+                        'index': False
+                    }
+                constraints[fk['FK_NAME']]['columns'].append(fk['FKCOLUMN_NAME'].lower())
+                if fk['PKCOLUMN_NAME'].lower() not in constraints[fk['FK_NAME']]['foreign_key']:
+                    fkeylist = list(constraints[fk['FK_NAME']]['foreign_key'])
+                    fkeylist.append(fk['PKCOLUMN_NAME'].lower())
+                    constraints[fk['FK_NAME']]['foreign_key'] = tuple(fkeylist)
+                
+            for index in cursor.connection.indexes( True, schema, table_name ):
+                if index['INDEX_NAME'] not in constraints:
+                    constraints[index['INDEX_NAME']] = {
+                        'columns': [],
+                        'primary_key': False,
+                        'unique': False,
+                        'foreign_key': None,
+                        'check': False,
+                        'index': True
+                    }
+                elif constraints[index['INDEX_NAME']]['unique'] :
+                    continue
+                elif constraints[index['INDEX_NAME']]['primary_key']:
+                    continue
+                constraints[index['INDEX_NAME']]['columns'].append(index['COLUMN_NAME'].lower())
+            return constraints

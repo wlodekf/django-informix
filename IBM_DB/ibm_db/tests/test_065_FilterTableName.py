@@ -90,4 +90,4 @@ class IbmDbTestCase(unittest.TestCase):
 #__IDS_EXPECTED__
 #table_cat, table_schem, table_name, table_type, remarks, 
 #
-#, %st%s, t3, TABLE%s, ,
+#, t, t3, TABLE, ,
