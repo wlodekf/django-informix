@@ -174,6 +174,7 @@ class DB2CursorWrapper( Database.Cursor ):
                         
                 except DatabaseError, e:
                     if (djangoVersion[0:2] >= (1, 5)):
+                        print operation, parameters
                         six.reraise(utils.DatabaseError, utils.DatabaseError( *tuple( six.PY3 and e.args or ( e._message, ) ) ), sys.exc_info()[2])
                         raise
                     else:

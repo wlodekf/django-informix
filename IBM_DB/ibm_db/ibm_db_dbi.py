@@ -451,7 +451,7 @@ def _server_connect(dsn, user='', password='', host=''):
         dsn = dsn + "UID=" + user + ";"
     if password != '' and dsn.find('PWD=') == -1:
         dsn = dsn + "PWD=" + password + ";"
-    try:    
+    try:
         conn = ibm_db.connect(dsn, '', '')
     except Exception, inst:
         raise _get_exception(inst)

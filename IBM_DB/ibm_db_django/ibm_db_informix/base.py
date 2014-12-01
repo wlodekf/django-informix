@@ -27,6 +27,7 @@ from django.db.backends import BaseDatabaseFeatures
 from ibm_db_informix import creation
 from ibm_db_informix import introspection
 from ibm_db_informix import operations
+from ibm_db_informix import schemaEditor
     
 class DatabaseFeatures( base.DatabaseFeatures ):    
     
@@ -108,3 +109,5 @@ class DatabaseWrapper( base.DatabaseWrapper ):
         """
         self.cursor().execute('SET CONSTRAINTS ALL IMMEDIATE')
  
+    def schema_editor(self, *args, **kwargs):
+        return schemaEditor.InformixSchemaEditor(self, *args, **kwargs)

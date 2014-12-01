@@ -19,6 +19,8 @@
 
 from django.db.backends.creation import BaseDatabaseCreation
 from django.db.models import ForeignKey
+from django import VERSION as djangoVersion
+
 from ibm_db_django import creation
 
 class DatabaseCreation ( creation.DatabaseCreation ):
@@ -32,13 +34,30 @@ class DatabaseCreation ( creation.DatabaseCreation ):
             'DateTimeField':                'DATETIME YEAR TO FRACTION(5)',
             'FloatField':                   'FLOAT',
             'TimeField':                    'DATETIME HOUR TO SECOND',
-            
-            'BooleanField':                 'SMALLINT CHECK ("%(attname)s" IN (0,1))',            
-            'NullBooleanField':             'SMALLINT CHECK ("%(attname)s" IN (0,1) OR ("%(attname)s" IS NULL))',
-            'PositiveIntegerField':         'INTEGER CHECK ("%(attname)s" >= 0)',
-            'PositiveSmallIntegerField':    'SMALLINT CHECK ("%(attname)s" >= 0)',
         })
+        
+        if( djangoVersion[0:2] <= ( 1, 6 ) ):
+            self.data_types.update({
+                'BooleanField':                 'SMALLINT CHECK ("%(attname)s" IN (0,1))',            
+                'NullBooleanField':             'SMALLINT CHECK ("%(attname)s" IN (0,1) OR ("%(attname)s" IS NULL))',
+                'PositiveIntegerField':         'INTEGER CHECK ("%(attname)s" >= 0)',
+                'PositiveSmallIntegerField':    'SMALLINT CHECK ("%(attname)s" >= 0)',
+            })
+        else:
+            self.data_types.update({
+                'BooleanField':                 'SMALLINT',
+                'NullBooleanField':             'SMALLINT',
+                'PositiveIntegerField':         'INTEGER',
+                'PositiveSmallIntegerField':    'SMALLINT',
+            })
                 
+        self.data_type_check_constraints = {
+            'BooleanField': '"%(attname)s" IN (0,1)',
+            'NullBooleanField': '("%(attname)s" IN (0,1)) OR (%(attname)s IS NULL)',
+            'PositiveIntegerField': '"%(attname)s" >= 0',
+            'PositiveSmallIntegerField': '"%(attname)s" >= 0',
+        }
+                    
     def sql_indexes_for_field( self, model, f, style ):
         """Return the CREATE INDEX SQL statements for a single model field.
         IDS - auto creates indexes for foreign key fields.
