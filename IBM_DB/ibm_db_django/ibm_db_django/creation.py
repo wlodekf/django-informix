@@ -166,13 +166,14 @@ class DatabaseCreation ( BaseDatabaseCreation ):
             if kwargsKeys.__contains__( 'port' ):
                 del kwargs['port']
             
-            if not autoclobber:
-                confirm = raw_input( "Wants to create %s as test database. Type yes to create it else type no" % ( kwargs.get( 'database' ) ) )
+#            if not autoclobber:
+#                confirm = raw_input( "Wants to create %s as test database. Type yes to create it else type no" % ( kwargs.get( 'database' ) ) )
+            confirm= 'yes'
             if autoclobber or confirm == 'yes':
                 try:
                     if verbosity > 1:
                         print "Creating Test Database %s" % ( kwargs.get( 'database' ) )
-                    Database.createdb( **kwargs )
+                    #Database.createdb( **kwargs )
                 except Exception, inst:
                     message = repr( inst )
                     if ( message.find( 'Not supported:' ) != -1 ):
