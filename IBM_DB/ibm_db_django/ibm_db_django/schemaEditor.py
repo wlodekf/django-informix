@@ -349,13 +349,11 @@ class DB2SchemaEditor(BaseDatabaseSchemaEditor):
             sql = ""
             if new_field.null:
                 sql = self.sql_alter_column_null % {
-                            'column': self.quote_name(new_field.column),
-                            'type': new_db_field_type,                            
+                            'column': self.quote_name(new_field.column)
                         }
             else:
                 sql = self.sql_alter_column_not_null % {
-                            'column': self.quote_name(new_field.column),
-                            'type': new_db_field_type,                            
+                            'column': self.quote_name(new_field.column)
                         }
             self.execute(
                 self.sql_alter_column % {

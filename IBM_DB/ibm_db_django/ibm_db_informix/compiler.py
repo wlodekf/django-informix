@@ -19,6 +19,8 @@
 
 from django.db.models.sql import compiler as base
 from ibm_db_django import compiler
+from django import VERSION as djangoVersion
+
         
 class SQLCompiler( compiler.SQLCompiler ):
     
@@ -57,3 +59,9 @@ class SQLAggregateCompiler( base.SQLAggregateCompiler, SQLCompiler ):
 
 class SQLDateCompiler( base.SQLDateCompiler, SQLCompiler ):
     pass
+
+if ( djangoVersion[0:2] >= ( 1, 6 )):
+    class SQLDateTimeCompiler(base.SQLDateTimeCompiler, SQLCompiler):
+        pass
+    
+    

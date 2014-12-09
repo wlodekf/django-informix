@@ -14,7 +14,6 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Swetha Patel, Abhigyan Agrawal, Tarun Pasrija, Rahul Priyadarshi|
-# | Wlodek Futrega                                                           |
 # +--------------------------------------------------------------------------+
 
 """
@@ -445,13 +444,14 @@ def _server_connect(dsn, user='', password='', host=''):
     else:
         dsn = "DSN=" + dsn + ";"
 
-    if dsn.find('attach=') == -1:
+    # Attach is not supported in IDS, connecting to sysmaster instead
+    if dsn.find('attach=') == -1 and not 'sysmaster' in dsn:
         dsn = dsn + "attach=true;"
     if user != '' and dsn.find('UID=') == -1:
         dsn = dsn + "UID=" + user + ";"
     if password != '' and dsn.find('PWD=') == -1:
         dsn = dsn + "PWD=" + password + ";"
-    try:
+    try:    
         conn = ibm_db.connect(dsn, '', '')
     except Exception, inst:
         raise _get_exception(inst)

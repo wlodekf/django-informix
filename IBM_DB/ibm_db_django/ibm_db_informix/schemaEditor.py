@@ -13,7 +13,7 @@
 # | KIND, either express or implied. See the License for the specific        |
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
-# | Authors: Rahul Priyadarshi                                               |
+# | Authors: Rahul Priyadarshi, Wlodek Futrega                               |
 # +--------------------------------------------------------------------------+
 
 import datetime
@@ -82,6 +82,9 @@ class InformixSchemaEditor(schemaEditor.DB2SchemaEditor):
                 
 
     def column_def(self, model, field, include_default=True, include_unique= True):
+        """
+        Append CHECK to column sql.
+        """
         # Get the column's definition (with default)
         definition, params = self.column_sql(model, field, include_default, include_unique)
         # It might not actually have a column behind it
@@ -136,6 +139,7 @@ class InformixSchemaEditor(schemaEditor.DB2SchemaEditor):
         # It might not actually have a column behind it
         if definition is None:
             return
+        
         # Build the SQL and run it
         sql = self.sql_create_column % {
             "table": self.quote_name(model._meta.db_table),
@@ -143,6 +147,16 @@ class InformixSchemaEditor(schemaEditor.DB2SchemaEditor):
             "definition": definition,
         }
         self.execute(sql, params)
+        
+        # Simulate the effect of a one-off default
+        # for blobs that do not support default
+        if self.skip_default(field) and field.has_default():
+            effective_default = self.effective_default(field)
+            self.execute('UPDATE %(table)s SET %(column)s=%(default)s' % {
+                'table': self.quote_name(model._meta.db_table),
+                'column': self.quote_name(field.column),
+                'default': self.prepare_default(field.get_default())            
+            })
         
         # Drop the default if we need to
         # (Django usually does not use in-database defaults)
@@ -194,10 +208,10 @@ class InformixSchemaEditor(schemaEditor.DB2SchemaEditor):
         
     def column_modify_sql(self, model, field, include_default=True, include_unique=True):
         """
-        Construct column MODIFY clause.
+        Construct column MODIFY clause (column redefinition) with or without
+        DEFAULT and/or UNIQUE.
         """
         definition, params = self.column_def(model, field, include_default, include_unique)
-        # Build the SQL
         return self.sql_modify_column % {
             "column": self.quote_name(field.column),
             "definition": definition,
@@ -459,3 +473,24 @@ class InformixSchemaEditor(schemaEditor.DB2SchemaEditor):
         if self.connection.features.connection_persists_old_columns:
             self.connection.close()
 
+
+    def _model_indexes_sql(self, model):
+        """
+        Return all index SQL statements (field indexes, index_together) for the
+        specified model, as a list.
+        
+        IDS: Don't create indexes for foreign keys as they are created
+        automatically on FK constraints creation which is before 
+        index creation.
+        """
+        if not model._meta.managed or model._meta.proxy or model._meta.swapped:
+            return []
+        output = []
+        for field in model._meta.local_fields:
+            if field.db_index and not field.unique and (not field.rel or not field.db_constraint):
+                output.append(self._create_index_sql(model, [field], suffix=""))
+
+        for field_names in model._meta.index_together:
+            fields = [model._meta.get_field_by_name(field)[0] for field in field_names]
+            output.append(self._create_index_sql(model, fields, suffix="_idx"))
+        return output

@@ -29,9 +29,12 @@ if not _IS_JYTHON:
 else:
     from com.ziclix.python.sql import zxJDBC
 
-from django.db.backends import BaseDatabaseIntrospection, FieldInfo
+from django.db.backends import BaseDatabaseIntrospection
 from django import VERSION as djangoVersion
-
+if djangoVersion >= (1, 6):
+    from django.db.backends import FieldInfo
+    
+    
 class DatabaseIntrospection( BaseDatabaseIntrospection ):
     
     """

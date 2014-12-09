@@ -143,12 +143,18 @@ class DatabaseCreation ( BaseDatabaseCreation ):
                         
         return output
     
+    def server_attach_db(self, kwargs):
+        """
+        Databae name to be used in DSN string while attaching to server.
+        """
+        return kwargs.get('dbname')
+    
     # Method to create and return test database, before creating test database it takes confirmation from user. 
     # If test database already exists then it takes confirmation from user to recreate that database .
     # If create test database not supported in current scenario then it takes confirmation from user to use settings file's database name as test database
     # For Jython this method prepare the settings file's database. First it drops the tables from the database,then create tables on the basis of installed models.
     def create_test_db( self, verbosity = 0, autoclobber = False, serialize=False ):
-        kwargs = self.__create_test_kwargs()
+        kwargs = self.__create_test_kwargs(True)
         if not _IS_JYTHON:
             old_database = kwargs['database']
             max_db_name_length = self.connection.ops.max_db_name_length()
@@ -157,7 +163,7 @@ class DatabaseCreation ( BaseDatabaseCreation ):
             if ( kwargsKeys.__contains__( 'port' ) and 
                     kwargsKeys.__contains__( 'host' ) ):
                     kwargs['dsn'] = "DATABASE=%s;HOSTNAME=%s;PORT=%s;PROTOCOL=TCPIP;" % ( 
-                             kwargs.get( 'dbname' ),
+                             self.server_attach_db(kwargs),
                              kwargs.get( 'host' ),
                              kwargs.get( 'port' )
                     )
@@ -166,14 +172,13 @@ class DatabaseCreation ( BaseDatabaseCreation ):
             if kwargsKeys.__contains__( 'port' ):
                 del kwargs['port']
             
-#            if not autoclobber:
-#                confirm = raw_input( "Wants to create %s as test database. Type yes to create it else type no" % ( kwargs.get( 'database' ) ) )
-            confirm= 'yes'
+            if not autoclobber:
+                confirm = raw_input( "Wants to create %s as test database. Type yes to create it else type no" % ( kwargs.get( 'database' ) ) )
             if autoclobber or confirm == 'yes':
                 try:
                     if verbosity > 1:
                         print "Creating Test Database %s" % ( kwargs.get( 'database' ) )
-                    #Database.createdb( **kwargs )
+                    Database.createdb( **kwargs )
                 except Exception, inst:
                     message = repr( inst )
                     if ( message.find( 'Not supported:' ) != -1 ):
@@ -246,13 +251,13 @@ class DatabaseCreation ( BaseDatabaseCreation ):
     def destroy_test_db( self, old_database_name, verbosity = 0 ):
         print "Destroying Database..."
         if not _IS_JYTHON:
-            kwargs = self.__create_test_kwargs()
+            kwargs = self.__create_test_kwargs(False)
             if( old_database_name != kwargs.get( 'database' ) ):
                 kwargsKeys = kwargs.keys()
                 if ( kwargsKeys.__contains__( 'port' ) and 
                     kwargsKeys.__contains__( 'host' ) ):
                     kwargs['dsn'] = "DATABASE=%s;HOSTNAME=%s;PORT=%s;PROTOCOL=TCPIP;" % ( 
-                             kwargs.get( 'database' ),
+                             self.server_attach_db(kwargs),
                              kwargs.get( 'host' ),
                              kwargs.get( 'port' )
                     )
@@ -328,8 +333,12 @@ class DatabaseCreation ( BaseDatabaseCreation ):
         cursor.execute( 'SET INTEGRITY FOR ' + style.SQL_TABLE( table_name ) + ' IMMEDIATE CHECKED;' )
         cursor.close()
         
-    #private method to create dictionary of login credentials for test database
-    def __create_test_kwargs( self ):
+    def __create_test_kwargs( self, creation ):
+        """
+        Private method to create dictionary of login credentials for test database.
+        creation: signals if server connection is for db creation (can be used for
+        additional info like logging mode setting).
+        """
         if( djangoVersion[0:2] <= ( 1, 1 ) ):
             if( isinstance( settings.TEST_DATABASE_NAME, basestring ) and 
                 ( settings.TEST_DATABASE_NAME != '' ) ):
@@ -370,5 +379,4 @@ class DatabaseCreation ( BaseDatabaseCreation ):
             
         if isinstance( database_host, basestring ):
             kwargs['host'] = database_host
-            
         return kwargs

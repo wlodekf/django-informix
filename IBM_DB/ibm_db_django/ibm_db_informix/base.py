@@ -22,12 +22,17 @@ Informix IDS backend for Django.
 """
 
 from ibm_db_django import base
+
+from django import VERSION as djangoVersion
 from django.db.backends import BaseDatabaseFeatures
 
 from ibm_db_informix import creation
 from ibm_db_informix import introspection
 from ibm_db_informix import operations
-from ibm_db_informix import schemaEditor
+
+if ( djangoVersion[0:2] >= ( 1, 7 )):
+    from ibm_db_informix import schemaEditor
+
     
 class DatabaseFeatures( base.DatabaseFeatures ):    
     
@@ -69,8 +74,8 @@ class DatabaseWrapper( base.DatabaseWrapper ):
         "iendswith":    "LIKE UPPER(%s) ESCAPE '\\'",
     }
 
-    def __init__( self, *args ):
-        super( DatabaseWrapper, self ).__init__( *args )
+    def __init__( self, *args, **kwargs ):
+        super( DatabaseWrapper, self ).__init__( *args, **kwargs )
         
         self.creation = creation.DatabaseCreation( self )
         self.introspection = introspection.DatabaseIntrospection( self )        

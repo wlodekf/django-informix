@@ -17,10 +17,11 @@
 # | Wlodek Futrega                                                           |
 # +--------------------------------------------------------------------------+
 
-from django.db.backends.creation import BaseDatabaseCreation
-from django.db.models import ForeignKey
-from django import VERSION as djangoVersion
+import sys
+_IS_JYTHON = sys.platform.startswith( 'java' )
 
+from django.db.models import ForeignKey
+from django.db import connections
 from ibm_db_django import creation
 
 class DatabaseCreation ( creation.DatabaseCreation ):
@@ -36,28 +37,6 @@ class DatabaseCreation ( creation.DatabaseCreation ):
             'TimeField':                    'DATETIME HOUR TO SECOND',
         })
         
-        if( djangoVersion[0:2] <= ( 1, 6 ) ):
-            self.data_types.update({
-                'BooleanField':                 'SMALLINT CHECK ("%(attname)s" IN (0,1))',            
-                'NullBooleanField':             'SMALLINT CHECK ("%(attname)s" IN (0,1) OR ("%(attname)s" IS NULL))',
-                'PositiveIntegerField':         'INTEGER CHECK ("%(attname)s" >= 0)',
-                'PositiveSmallIntegerField':    'SMALLINT CHECK ("%(attname)s" >= 0)',
-            })
-        else:
-            self.data_types.update({
-                'BooleanField':                 'SMALLINT',
-                'NullBooleanField':             'SMALLINT',
-                'PositiveIntegerField':         'INTEGER',
-                'PositiveSmallIntegerField':    'SMALLINT',
-            })
-                
-        self.data_type_check_constraints = {
-            'BooleanField': '"%(attname)s" IN (0,1)',
-            'NullBooleanField': '("%(attname)s" IN (0,1)) OR (%(attname)s IS NULL)',
-            'PositiveIntegerField': '"%(attname)s" >= 0',
-            'PositiveSmallIntegerField': '"%(attname)s" >= 0',
-        }
-                    
     def sql_indexes_for_field( self, model, f, style ):
         """Return the CREATE INDEX SQL statements for a single model field.
         IDS - auto creates indexes for foreign key fields.
@@ -73,7 +52,7 @@ class DatabaseCreation ( creation.DatabaseCreation ):
         Replacing VARCHAR(x) by LVARCHAR(x) for x>255.
         """
         import re
-        sql, references = BaseDatabaseCreation.sql_create_model( self, model, style, known_models )
+        sql, references = super(creation.DatabaseCreation, self).sql_create_model( model, style, known_models )
         sql= [re.sub('(VARCHAR\((\d+)\))', lambda m: ('L' if int(m.group(2))>255 else '')+m.group(1), field) for field in sql]
         sql= [re.sub('DECIMAL\(38, 30\)', 'DECIMAL(28, 20)', field) for field in sql]
         return sql, references
@@ -104,5 +83,23 @@ class DatabaseCreation ( creation.DatabaseCreation ):
                         r_name, self.connection.ops.max_name_length()))))
             del pending_references[model]
         return final_output 
+
+    def server_attach_db(self, kwargs):
+        return 'sysmaster'
     
-    
+    def __create_test_kwargs( self, mode ):
+        """
+        Eventualy (for db creation only) add mode (transactionality).
+        """
+        kwargs= super(DatabaseCreation, self).__create_test_kwargs(mode)
+        if mode: 
+            kwargs['mode']= 'BUFFERED LOG'
+        return kwargs
+
+
+    def create_test_db( self, verbosity = 0, autoclobber = False, serialize=False ):
+        """
+        Turn off prompts (set autoclobber).
+        """
+        super(DatabaseCreation, self).create_test_db(verbosity, True, serialize)        
+        

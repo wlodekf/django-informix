@@ -21,8 +21,9 @@ import sys
 _IS_JYTHON = sys.platform.startswith( 'java' )
 
 from ibm_db_django import introspection
-from django.db.backends import FieldInfo
 from django import VERSION as djangoVersion
+if djangoVersion >= (1, 6):
+    from django.db.backends import FieldInfo
 
 class DatabaseIntrospection( introspection.DatabaseIntrospection ):
     

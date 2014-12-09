@@ -137,8 +137,8 @@ class DatabaseWrapper( BaseDatabaseWrapper ):
     if( djangoVersion[0:2] >= ( 1, 6 ) ):
         Database = Database
     # Constructor of DB2 backend support. Initializing all other classes.
-    def __init__( self, *args ):
-        super( DatabaseWrapper, self ).__init__( *args )
+    def __init__( self, *args, **kwargs ):
+        super( DatabaseWrapper, self ).__init__( *args, **kwargs )
         self.ops = DatabaseOperations( self )
         if( djangoVersion[0:2] <= ( 1, 0 ) ):
             self.client = DatabaseClient()
